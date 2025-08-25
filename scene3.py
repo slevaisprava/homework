@@ -2,19 +2,25 @@ import yaml
 
 yaml_code = """
 steps:
-  - set_var:
-      login_time: "$time(%Y-%m-%d %H:%M:%S)"
-  - log: template1.template
-  - wait: 2s
-  - log: ssh_failed_password.template
-  - wait: 1s
+  - log: "1start"
+  - log: "start"
   - repeat:
-      count: 4
+      count: 2
       steps:
-        - log: loop1
+        - log: "level 1 - A"
         - wait: 1s
-        - log: loop2
-        - wait: 1s
+        - repeat:
+            count: 3
+            steps:
+              - log: "level 2 - B"
+              - wait: 0.5s
+              - repeat:
+                  count: 2
+                  steps:
+                    - log: "level 3 - D"
+                    - wait: 0.5s
+        - log: "level 1 - C"
+  - log: "after all repeats"
 """
 
 data = yaml.safe_load(yaml_code)
@@ -27,9 +33,10 @@ def run(commands):
     while stack:
         cmds, i, repeat_left = stack.pop()
 
-        # закончили список → проверим повторы
+        # если дошли до конца списка
         if i >= len(cmds):
             if repeat_left > 1:
+                # повторяем блок заново
                 stack.append((cmds, 0, repeat_left - 1))
             continue
 
@@ -50,14 +57,14 @@ def run(commands):
             inner_cmds = cmd["repeat"]["steps"]
             # Сначала вернём в стек продолжение после repeat
             stack.append((cmds, i+1, repeat_left))
-            # Потом положим вложенные команды
+            # Потом положим вложенные команды repeat
             stack.append((inner_cmds, 0, count))
             continue
 
         else:
             raise ValueError(f"Неизвестная команда: {cmd}")
 
-        # вернём в стек текущий блок, но сдвинем индекс
+        # кладём обратно текущий блок, но двигаем индекс
         stack.append((cmds, i+1, repeat_left))
 
 
